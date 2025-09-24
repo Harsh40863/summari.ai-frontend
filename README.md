@@ -1,4 +1,4 @@
-# DocuMind AI - Intelligent Document Search & Analysis Platform
+# summary.ai - Intelligent Document Search & Analysis Platform
 
 A beautiful, dark-themed frontend for AI-powered document search, exploration, and analysis with multi-language translation support.
 

@@ -169,20 +169,18 @@ const Index = () => {
                 </SheetContent>
               </Sheet>
 
-              {/* Logo */}
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
                   <Brain className="w-6 h-6 text-primary-foreground" />
                 </div>
                 <div>
                   <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                    DocuMind AI
+                    summary.ai
                   </h1>
                   <p className="text-xs text-muted-foreground">Intelligent Document Platform</p>
                 </div>
               </div>
             </div>
-
             {/* Status Badge */}
             <div className="flex items-center space-x-3">
               {systemHealth && (

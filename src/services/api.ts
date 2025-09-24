@@ -7,19 +7,47 @@ import type {
   HealthResponse,
   SupportedLanguagesResponse,
 } from '../types/api';
-
 // Configure the base URL - adjust this to your FastAPI server
-const BASE_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://your-api-domain.com' 
-  : 'http://localhost:8080';
+const BASE_URL = 'http://localhost:8000';
 
 const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// Normalize backend response shape to UI-expected QueryResponse
+function normalizeQueryResponse(raw: any): QueryResponse {
+  const items = Array.isArray(raw?.results) ? raw.results.map((r: any) => ({
+    content: r?.content ?? r?.summary ?? r?.best_sentence ?? '',
+    metadata: {
+      document_name: r?.document_name ?? r?.source ?? r?.metadata?.document_name,
+      best_sentence: r?.best_sentence,
+      score: r?.score,
+      summary: r?.summary,
+      web_content: r?.web_content,
+      refined_insight: r?.refined_insight,
+      // PPT specific fields
+      ppt_path: r?.ppt_path,
+      file_name: r?.file_name,
+      action_type: r?.action_type,
+      ...(r?.metadata && typeof r.metadata === 'object' ? r.metadata : {}),
+    },
+    similarity: typeof r?.similarity === 'number' ? r.similarity : (typeof r?.score === 'number' ? r.score : undefined),
+    source: r?.source ?? r?.document_name,
+  })) : [];
+
+  return {
+    success: Boolean(raw?.success),
+    message: raw?.message ?? '',
+    results: items,
+    action: raw?.action ?? raw?.action_type ?? 'search',
+    timestamp: raw?.timestamp ?? new Date().toISOString(),
+    query: raw?.query ?? '',
+    translation: raw?.translation,
+  } as QueryResponse;
+}
 
 // API service functions
 export const apiService = {
@@ -58,7 +86,7 @@ export const apiService = {
   // Query operations
   async query(request: QueryRequest): Promise<QueryResponse> {
     const response = await api.post<QueryResponse>('/query', request);
-    return response.data;
+    return normalizeQueryResponse(response.data);
   },
 
   async search(query: string, threshold = 0.35, translate_to = 'en'): Promise<QueryResponse> {
@@ -67,8 +95,8 @@ export const apiService = {
       action: 'search',
       threshold,
       translate_to,
-    });
-    return response.data;
+    }, { timeout: 0 });
+    return normalizeQueryResponse(response.data);
   },
 
   async explore(query: string, threshold = 0.35): Promise<QueryResponse> {
@@ -76,8 +104,8 @@ export const apiService = {
       query,
       action: 'explore',
       threshold,
-    });
-    return response.data;
+    }, { timeout: 0 });
+    return normalizeQueryResponse(response.data);
   },
 
   async think(query: string, threshold = 0.35, translate_to = 'en'): Promise<QueryResponse> {
@@ -86,8 +114,8 @@ export const apiService = {
       action: 'think',
       threshold,
       translate_to,
-    });
-    return response.data;
+    }, { timeout: 0 });
+    return normalizeQueryResponse(response.data);
   },
 
   async generatePPT(query: string, threshold = 0.35): Promise<QueryResponse> {
@@ -95,8 +123,8 @@ export const apiService = {
       query,
       action: 'ppt',
       threshold,
-    });
-    return response.data;
+    }, { timeout: 0 });
+    return normalizeQueryResponse(response.data);
   },
 
   // Document management
@@ -116,6 +144,13 @@ export const apiService = {
       responseType: 'blob',
     });
     return response.data;
+  },
+
+  // Open PPT (for preview/viewing)
+  async openPPT(path: string): Promise<string> {
+    const blob = await this.downloadPPT(path);
+    const url = window.URL.createObjectURL(blob);
+    return url;
   },
 
   // System operations

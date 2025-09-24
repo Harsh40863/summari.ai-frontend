@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Search, Brain, Compass, FileSpreadsheet, Loader2, Languages, Settings } from 'lucide-react';
+import { Search, Brain, Compass, FileSpreadsheet, Loader2, Languages } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useToast } from '@/hooks/use-toast';
 import { apiService } from '@/services/api';
 import type { QueryRequest, QueryResponse, SupportedLanguagesResponse } from '@/types/api';
@@ -53,10 +51,8 @@ const actions = [
 const SearchInterface = ({ onSearchResults }: SearchInterfaceProps) => {
   const [query, setQuery] = useState('');
   const [selectedAction, setSelectedAction] = useState<'search' | 'explore' | 'think' | 'ppt'>('search');
-  const [threshold, setThreshold] = useState([0.35]);
   const [translateTo, setTranslateTo] = useState('en');
   const [loading, setLoading] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [languages, setLanguages] = useState<SupportedLanguagesResponse | null>(null);
   const { toast } = useToast();
 
@@ -67,9 +63,25 @@ const SearchInterface = ({ onSearchResults }: SearchInterfaceProps) => {
   const loadLanguages = async () => {
     try {
       const response = await apiService.getSupportedLanguages();
+      console.log('Languages loaded:', response);
       setLanguages(response);
     } catch (error) {
       console.error('Failed to load languages:', error);
+      // Fallback to default languages if API fails
+      setLanguages({
+        languages: {
+          'en': 'English',
+          'hi': 'Hindi',
+          'fr': 'French',
+          'es': 'Spanish',
+          'de': 'German',
+          'ja': 'Japanese',
+          'ko': 'Korean',
+          'zh': 'Chinese'
+        },
+        default: 'en',
+        note: 'Translation available for search and think actions only'
+      });
     }
   };
 
@@ -88,16 +100,22 @@ const SearchInterface = ({ onSearchResults }: SearchInterfaceProps) => {
       const request: QueryRequest = {
         query: query.trim(),
         action: selectedAction,
-        threshold: threshold[0],
+        threshold: 0.35,
         translate_to: translateTo,
       };
 
+      console.log('Sending request:', request);
       const response = await apiService.query(request);
+      console.log('Received response:', response);
       
       if (response.success) {
+        let description = response.message;
+        if (response.translation && translateTo !== 'en') {
+          description += ` (Translated to ${response.translation.target_language_name})`;
+        }
         toast({
           title: "Query completed",
-          description: response.message,
+          description: description,
         });
         onSearchResults?.(response);
       } else {
@@ -205,45 +223,15 @@ const SearchInterface = ({ onSearchResults }: SearchInterfaceProps) => {
           {translateTo !== 'en' && (
             <p className="text-xs text-accent">
               Results will be translated to {languages.languages[translateTo]}
+              {!supportsTranslation && (
+                <span className="text-warning ml-2">
+                  (Translation not available for {selectedAction} action)
+                </span>
+              )}
             </p>
           )}
         </div>
       )}
-
-      {/* Advanced Settings */}
-      <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" className="w-full justify-between p-0">
-            <span className="flex items-center gap-2 text-sm font-medium">
-              <Settings className="w-4 h-4" />
-              Advanced Settings
-            </span>
-            <span className="text-xs text-muted-foreground">
-              {showAdvanced ? 'Hide' : 'Show'}
-            </span>
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-4 mt-4">
-          <div className="glass rounded-lg p-4 space-y-4">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-foreground">
-                Similarity Threshold: {threshold[0].toFixed(2)}
-              </Label>
-              <Slider
-                value={threshold}
-                onValueChange={setThreshold}
-                max={1}
-                min={0.1}
-                step={0.05}
-                className="w-full"
-              />
-              <p className="text-xs text-muted-foreground">
-                Higher values return more precise results, lower values return more diverse results
-              </p>
-            </div>
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
 
       {/* Search Button */}
       <Button
